@@ -1,0 +1,18 @@
+Q3: Edad
+Q4: Género
+Q5: Grado de Instrucción
+Q6: Zona en la que habita
+Q7_1: Frecuencia de consumo de contenido político en Twitter
+Q7_2: Frecuencia de consumo de contenido político en Whatsapp
+Q7_3: Frecuencia de consumo de contenido político en Facebook
+Q7_4: Frecuencia de consumo de contenido político en Instagram
+Q7_5: Frecuencia de consumo de contenido político en TikTok
+Q8: Actividades que realiza en RRSS
+Q9: Escala ideológica
+T: Recibió tratamiento
+VD1: Escala de percepción de las personas que participaron en las manifestaciones
+VD2_1: Aprobación de la siguiente frase: Todas las personas participantes protestaron en contra de la vacancia de Pedro Castillo impulsada por el Congreso
+VD2_2: Aprobación de la siguiente frase: Todos los manifestantes eran pacíficos
+VD2_3: Aprobación de la siguiente frase: Las tácticas de los manifestantes fueron similares a las estrategias de grupos terroristas
+VD2_4: Aprobación de la siguiente frase: Las protestas fueron cada vez más violentas y radicales
+VD2_5: Aprobación de la siguiente frase: Debió evitarse que personas que no son de Lima vinieran a protestar
