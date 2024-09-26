@@ -1,0 +1,843 @@
+---
+title: "Análisis de Resultados"
+author: "Mattias Salazar"
+date: "2024-06-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r}
+library(rio)
+library(dplyr)
+library(car)
+library(ggplot2)
+library(lsr)
+library(Rmisc)
+library(stargazer)
+library(dplyr)
+library(jtools)
+library(DescTools)
+library(haven)
+library(descr)
+library(survey)
+library(psych)
+library(rmdformats)
+library(fastDummies)
+```
+
+    
+# **Revisión de la Data**
+
+## **Preparación de variables**
+   
+```{r}
+data=import("ResultadosFinales.xlsx")
+```
+   
+```{r}
+puntos_corteedad <- c(14, 26, 59, Inf)  # Definición de los puntos de corte para las categorías de edad
+etiquetasedad <- c("Jóvenes", "Adultos", "Adultos Mayores")  # Etiquetas para cada categoría de edad
+
+# Crear la nueva columna Q3_1 con las categorías de edad
+data$Q3_1 <- cut(data$Q3, breaks = puntos_corteedad, labels = etiquetasedad, include.lowest = TRUE, right = FALSE)
+```
+   
+   
+```{r}
+niveles_ordenados <- c("Educación Primaria", 
+                       "Educación Secundaria", 
+                       "Educación Superior Técnica", 
+                       "Educación Superior Universitaria", 
+                       "Maestría", 
+                       "Doctorado")
+```
+   
+```{r}
+data <- data %>%
+  mutate(
+    Q6 = case_when(
+      Q6 == "Zona 1: Ancón, Carabayllo, Comas, Independencia, Los Olivos, Puente Piedra, San Martín de Porres y Santa Rosa" ~ "Lima Norte",
+      Q6 == "Zona 2: Breña, La Victoria, Lima (Cercado), Rímac y San Luis" ~ "Lima Centro",
+      Q6 == "Zona 3: Barranco, Jesús María, La Molina, Lince, Magdalena del Mar, Miraflores, Pueblo Libre, San Borja, San Isidro, San Miguel, Santiago de Surco y Surquillo" ~ "Lima Oeste",
+      Q6 == "Zona 4: Ate-Vitarte, Chaclacayo, Cieneguilla, El Agustino, Lurigancho (Chosica), San Juan de Lurigancho y Santa Anita" ~ "Lima Este",
+      Q6 == "Zona 5: Chorrillos, Lurín, Pachacamac, Pucusana, Punta Hermosa, Punta Negra, San Bartolo, San Juan de Miraflores, Santa María del Mar, Villa el Salvador y Villa María del Triunfo" ~ "Lima Sur",
+      Q6 == "Zona 6: Bellavista, Callao, Carmen de la Legua, La Perla, La Punta, Ventanilla y Mi Perú" ~ "Callao",
+      TRUE ~ Q6  # Para mantener los valores originales en caso de que no coincidan con ninguno de los anteriores
+    )
+  )
+```
+   
+```{r}
+data <- data %>%
+  mutate(
+    Q7_1 = case_when(
+      Q7_1 == "Nunca" ~ 0,
+      Q7_1 == "Algunas veces al año" ~ 1,
+      Q7_1 == "Algunas veces al mes" ~ 2,
+      Q7_1 == "Algunas veces a la semana" ~ 3,
+      Q7_1 == "Diariamente" ~ 4
+    ),
+    Q7_2 = case_when(
+      Q7_2 == "Nunca" ~ 0,
+      Q7_2 == "Algunas veces al año" ~ 1,
+      Q7_2 == "Algunas veces al mes" ~ 2,
+      Q7_2 == "Algunas veces a la semana" ~ 3,
+      Q7_2 == "Diariamente" ~ 4
+    ),
+    Q7_3 = case_when(
+      Q7_3 == "Nunca" ~ 0,
+      Q7_3 == "Algunas veces al año" ~ 1,
+      Q7_3 == "Algunas veces al mes" ~ 2,
+      Q7_3 == "Algunas veces a la semana" ~ 3,
+      Q7_3 == "Diariamente" ~ 4
+    ),
+    Q7_4 = case_when(
+      Q7_4 == "Nunca" ~ 0,
+      Q7_4 == "Algunas veces al año" ~ 1,
+      Q7_4 == "Algunas veces al mes" ~ 2,
+      Q7_4 == "Algunas veces a la semana" ~ 3,
+      Q7_4 == "Diariamente" ~ 4
+    ),
+    Q7_5 = case_when(
+      Q7_5 == "Nunca" ~ 0,
+      Q7_5 == "Algunas veces al año" ~ 1,
+      Q7_5 == "Algunas veces al mes" ~ 2,
+      Q7_5 == "Algunas veces a la semana" ~ 3,
+      Q7_5 == "Diariamente" ~ 4
+    )
+  )
+
+```
+ 
+```{r}
+data$Q7=data$Q7_1+data$Q7_2+data$Q7_3+data$Q7_4+data$Q7_5
+data$Q7=data$Q7/2
+```
+ 
+ 
+```{r}
+data <- data %>%
+  mutate(
+    Q8 = case_when(
+      grepl("Crea contenido", Q8) ~ 3,
+      grepl("Comparte contenido", Q8) & !grepl("Crea contenido", Q8) ~ 2,
+      grepl("Recibe contenido", Q8) & !grepl("Comparte contenido", Q8) & !grepl("Crea contenido", Q8) ~ 1,
+      Q8 == "" ~ 0,
+      TRUE ~ 0  # Manejo por defecto si ninguna condición se cumple (aunque esto debería ser redundante con la última línea)
+    )
+  )
+```
+ 
+```{r}
+# Transformar las variables VD2_1 a VD2_5 a numéricas usando case_when
+data <- data %>%
+  mutate(
+    VD2_1 = case_when(
+      VD2_1 == "Totalmente en desacuerdo" ~ 4,
+      VD2_1 == "Ligeramente en desacuerdo" ~ 3,
+      VD2_1 == "Ni en acuerdo ni en desacuerdo" ~ 2,
+      VD2_1 == "Ligeramente de acuerdo" ~ 1,
+      VD2_1 == "Totalmente de acuerdo" ~ 0
+    ),
+    VD2_2 = case_when(
+      VD2_2 == "Totalmente en desacuerdo" ~ 0,
+      VD2_2 == "Ligeramente en desacuerdo" ~ 1,
+      VD2_2 == "Ni en acuerdo ni en desacuerdo" ~ 2,
+      VD2_2 == "Ligeramente de acuerdo" ~ 3,
+      VD2_2 == "Totalmente de acuerdo" ~ 4
+    ),
+    VD2_3 = case_when(
+      VD2_3 == "Totalmente en desacuerdo" ~ 4,
+      VD2_3 == "Ligeramente en desacuerdo" ~ 3,
+      VD2_3 == "Ni en acuerdo ni en desacuerdo" ~ 2,
+      VD2_3 == "Ligeramente de acuerdo" ~ 1,
+      VD2_3 == "Totalmente de acuerdo" ~ 0
+    ),
+    VD2_4 = case_when(
+      VD2_4 == "Totalmente en desacuerdo" ~ 4,
+      VD2_4 == "Ligeramente en desacuerdo" ~ 3,
+      VD2_4 == "Ni en acuerdo ni en desacuerdo" ~ 2,
+      VD2_4 == "Ligeramente de acuerdo" ~ 1,
+      VD2_4 == "Totalmente de acuerdo" ~ 0
+    ),
+    VD2_5 = case_when(
+      VD2_5 == "Totalmente en desacuerdo" ~ 4,
+      VD2_5 == "Ligeramente en desacuerdo" ~ 3,
+      VD2_5 == "Ni en acuerdo ni en desacuerdo" ~ 2,
+      VD2_5 == "Ligeramente de acuerdo" ~ 1,
+      VD2_5 == "Totalmente de acuerdo" ~ 0
+    )
+  )
+
+```
+ 
+```{r}
+data$VD2=data$VD2_1+data$VD2_2+data$VD2_4+data$VD2_5
+data$VD2 <- (data$VD2/16)*10
+```
+ 
+ 
+```{r}
+data <- data %>%
+  mutate(
+    TA = if_else(is.na(TA), "Control", "Tratamiento")
+  )
+```
+   
+```{r}
+data$Q4<-as.factor(data$Q4)
+data$Q5 <- factor(data$Q5, levels = niveles_ordenados, ordered = TRUE)
+data$Q6<-as.factor(data$Q6)
+data$TA <- factor(data$TA, levels = c("Tratamiento", "Control"))
+```
+   
+```{r}
+data$TABI <- data$TA
+# Recodificar la variable TABI
+data$TABI <- ifelse(data$TABI == "Control", 0, 
+                        ifelse(data$TABI == "Tratamiento", 1, NA))
+
+# Convertir la variable a numérica si es necesario
+data$TABI <- as.numeric(data$TABI)
+
+```
+   
+   
+```{r}
+data$edad<-data$TABI*data$Q3
+data$ideo<-data$TABI*data$Q9_1
+```
+   
+   
+```{r}
+puntos_corteQ9 <- c(0, 4, 6, 10)
+etiquetasQ9 <- c("Izquierda", "Centro", "Derecha")
+
+# Convertir la variable numérica en un factor con categorías etiquetadas
+data$Q9_2 <- cut(data$Q9_1, breaks = puntos_corteQ9, labels = etiquetasQ9, include.lowest = TRUE)
+```
+   
+   
+```{r}
+str(data)
+```
+    
+## **Análisis Exploratorio**   
+
+### Edad
+```{r}
+summary(data$Q3)
+```
+   
+### Género
+```{r}
+summary(data$Q4)
+```
+   
+### Grado de Instrucción
+```{r}
+summary(data$Q5)
+```
+   
+### Zona en la que habita
+```{r}
+summary(data$Q6)
+```
+   
+### Frecuencia de consumo de contenido político en múltiples redes sociales
+```{r}
+summary(data$Q7)
+```
+Significado: a mayor valor, mayor frecuencia de consumo y mayor cantidad de redes. 0 es sin frecuencia. 
+    
+### Frecuencia de consumo de contenido político en Twitter/X
+```{r}
+summary(data$Q7_1)
+```
+Significado: a mayor valor, mayor frecuencia de consumo. 0 es sin frecuencia.    
+    
+### Frecuencia de consumo de contenido político en Whatsapp
+```{r}
+summary(data$Q7_2)
+```
+Significado: a mayor valor, mayor frecuencia de consumo. 0 es sin frecuencia.      
+
+### Frecuencia de consumo de contenido político en Facebook
+```{r}
+summary(data$Q7_3)
+```
+Significado: a mayor valor, mayor frecuencia de consumo. 0 es sin frecuencia.    
+
+### Frecuencia de consumo de contenido político en Instagram
+```{r}
+summary(data$Q7_4)
+```
+Significado: a mayor valor, mayor frecuencia de consumo. 0 es sin frecuencia.    
+
+### Frecuencia de consumo de contenido político en TikTok
+```{r}
+summary(data$Q7_5)
+```
+Significado: a mayor valor, mayor frecuencia de consumo. 0 es sin frecuencia.    
+     
+### Nivel de engagement político en Redes Sociales
+```{r}
+summary(data$Q8)
+```
+Significado: a mayor valor, mayor engagement político en Redes Sociales. Con engagement me refiero a las actividades en las que participa. Los números mayores representan actividades que requieren de mayor involucramiento y participación. 0 es no participa.
+    
+### Escala de Ideología Política
+```{r}
+summary(data$Q9_2)
+```
+     
+### Grupo de Control o Tratamiento
+```{r}
+summary(data$TA)
+```
+     
+### Escala de percepción de los manifestantes
+```{r}
+summary(data$VD1_1)
+```
+Significado: 1 es tener una percepción muy negativa de los manifestantes y 10 es muy positiva.     
+     
+### Escala de aprobación de afirmaciones positivas sobre los manifestantes
+```{r}
+summary(data$VD2)
+```
+Significado: mientras mayor sea el valor, mayor es el acuerdo con 5 afirmaciones positivas sobre los manifestantes. 0 representa estar en desacuerdo con las 5 afirmaciones.      
+       
+
+# **Comparación de medias de grupos de control y tratamiento**  
+   
+### Comparación de edad
+```{r}
+t.test (data$Q3~data$TA)
+```
+P value es mayor que 0.05, por lo tanto no hay diferencias.  
+    
+### Comparación de género
+```{r}
+tabla_contingenciagenero <- table(data$TA, data$Q4)
+print(tabla_contingenciagenero)
+```
+   
+```{r}
+chi_testgenero <- chisq.test(tabla_contingenciagenero)
+print(chi_testgenero)
+```
+Como el p value es mayor que 0.05, no hay diferencia entre los grupos.  
+   
+### Comparación de grado de instrucción
+```{r}
+tabla_contingenciainstruccion <- table(data$TA, data$Q5)
+print(tabla_contingenciainstruccion)
+```
+  
+  
+```{r}
+resultadoinstruccion <- wilcox.test(as.numeric(data$Q5) ~ data$TA, exact = FALSE)
+print(resultadoinstruccion)
+```
+P value es mayor que 0.05 por lo que no hay diferencia entre los grupos.      
+     
+### Comparación de zonas de residencia
+```{r}
+tabla_contingenciazona <- table(data$TA, data$Q6)
+print(tabla_contingenciazona)
+```
+    
+```{r}
+resultadozona <- chisq.test(tabla_contingenciazona)
+print(resultadozona)
+```
+El pvalue es mayor que 0.05, por lo tanto no hay diferencia entre los grupos.   
+   
+### Comparación de actividades que realizan en redes sociales
+```{r}
+t.test (data$Q8~data$TA)
+```
+El pvalue es mayor que 0.05, por lo tanto no hay diferencia entre los grupos.   
+    
+### Comparación de escala ideológica
+```{r}
+t.test (data$Q9_1~data$TA)
+```
+El pvalue es mayor que 0.05, por lo tanto no hay diferencia entre los grupos.     
+     
+En conclusión, los valores en las variables de medición preliminar son iguales tanto en el grupo de control como en el de tratamiento. Esto significa que los grupos son similares y comparables entre sí. Por lo tanto, la variable diferente sería la exposición al tratamiento.    
+     
+# **Comparación de variables dependientes**    
+
+## **Comparación según grupos de control y tratamiento**
+
+### Comparación de escala de percepción
+```{r}
+t.test (data$VD1~data$TA)
+```
+   
+Dado que p value es menor que 0.05, podemos afirmar que sí existe diferencia entre los grupos.  
+   
+### Comparación de la aprobación de de afirmaciones positivas
+```{r}
+t.test (data$VD2~data$TA)
+```
+El pvalue es menor que 0.05, por lo tanto sí hay diferencia entre los grupos.  
+    
+## **Comparación según variables de control**   
+    
+### Según edad
+
+#### VD1    
+```{r}
+VD1Q3<-aov(data$VD1~data$Q3_1)
+summary(VD1Q3)
+```
+```{r}
+TukeyHSD(VD1Q3)
+```
+
+Sí hay diferencias.   
+
+```{r}
+describeBy(data$VD1, group=data$Q3_1)
+```
+Las personas jóvenes tienen una percepción más positiva.
+   
+#### VD2    
+```{r}
+VD2Q3<-aov(data$VD2~data$Q3_1)
+summary(VD2Q3)
+```
+
+```{r}
+TukeyHSD(VD2Q3)
+```
+
+Sí hay diferencias.   
+
+```{r}
+describeBy(data$VD2, group=data$Q3_1)
+```
+Mientras menores sean las personas, mayor es la aprobación por las afirmaciones positivas.   
+
+### Según género
+   
+#### VD1   
+```{r}
+t.test (data$VD1~data$Q4)
+```
+No hay diferencias.  
+
+#### VD2   
+```{r}
+t.test (data$VD2~data$Q4)
+```
+No hay diferencias.  
+    
+### Según Zona
+    
+#### VD1    
+```{r}
+VD1Q6<-aov(data$VD1~data$Q6)
+summary(VD1Q6)
+```
+No hay diferencias.   
+   
+#### VD2    
+```{r}
+VD2Q6<-aov(data$VD2~data$Q6)
+summary(VD2Q6)
+```
+Sí hay diferencias   
+
+```{r}
+TukeyHSD(VD2Q6)
+```
+
+Sí hay diferencias.   
+
+```{r}
+describeBy(data$VD2, group=data$Q6)
+```
+
+
+   
+### Según Ideología
+    
+#### VD1    
+```{r}
+VD1Q9<-aov(data$VD1~data$Q9_2)
+summary(VD1Q9)
+```
+```{r}
+TukeyHSD(VD1Q9)
+```
+
+Sí hay diferencias.   
+
+```{r}
+describeBy(data$VD1, group=data$Q9_2)
+```
+Las personas de izquierda tienen una percepción más positiva, y las de derecha más negativa.
+   
+#### VD2    
+```{r}
+VD2Q9<-aov(data$VD2~data$Q9_2)
+summary(VD2Q9)
+```
+
+```{r}
+TukeyHSD(VD2Q9)
+```
+
+Sí hay diferencias.   
+
+```{r}
+describeBy(data$VD2, group=data$Q9_2)
+```
+Las personas de izquierda tienen una mayor aprobación de las afirmaciones positivas, y las de derecha menor.   
+    
+En conclusión, las variables edad e ideología también afectan en la percepción de los manifestantes, no solo la exposición al tratamiento.    
+     
+     
+     
+# **Predicción de las variables dependientes**
+## **Variable Dependiente 1**
+
+```{r}
+# Fusionar las categorías y renombrarlas
+data$Q5_recoded <- ifelse(data$Q5 %in% c("Educación Primaria", "Educación Secundaria"), "Escolar",
+                   ifelse(data$Q5 %in% c("Educación Superior Técnica", "Educación Superior Universitaria"), "Pregrado",
+                   ifelse(data$Q5 %in% c("Maestría", "Doctorado"), "Posgrado", NA)))
+
+# Convertir en factor si es necesario
+data$Q5_recoded <- factor(data$Q5_recoded, levels = c("Escolar", "Pregrado", "Posgrado"))
+
+data <- within(data, Q5_dummies <- model.matrix(~ Q5_recoded - 1))
+
+```
+
+```{r}
+
+```
+
+
+### Primer Modelo
+```{r}
+modelo1 <- lm(VD1_1 ~ Q3 + Q4 + Q5_dummies[, "Q5_recodedEscolar"]+Q5_dummies[, "Q5_recodedPregrado"] + Q7 + Q8 + Q9_1 + TABI, data = data)
+summary(modelo1)
+```
+  
+En este primer modelo para predecir la percepción de los manifestantes se están usando las variables edad, género, nivel educativo, frecuencia de uso de redes sociales, nivel de engagement en redes sociales, ideología política, y exposición a fake news. Según la literatura presentada, estas son las variables más importantes para predecir las variables dependientes.   
+    
+Podemos observar que, según el modelo, las únicas variables que aportan son edad, ideología y exposición a fake news. Esto coincide con las diferencias de medias entre ambos grupos. 
+      
+### Segundo Modelo    
+    
+```{r}
+modelo2 <- lm(VD1_1 ~ Q3 + Q9_1 +TABI, data = data)
+summary(modelo2)
+```
+    
+Dado que este modelo es más simple, que todas las variables son relevantes, y que tiene un porcentaje de predicción similar al otro, optaremos por utilizarlo.   
+
+```{r}
+modelo3 <- lm(VD1_1 ~ Q3 + Q9_1 +TABI+edad+ideo, data = data)
+summary(modelo3)
+```
+
+
+Ahora comprobaremos su validez  
+   
+```{r}
+# Paso 3: Diagnósticos del modelo
+# 3.1: Residuales vs Ajustados
+plot(modelo2, which = 1)
+
+# 3.2: Normalidad de los residuales (Q-Q plot)
+plot(modelo2, which = 2)
+
+# 3.3: Escala-Localización (Homoscedasticidad)
+plot(modelo2, which = 3)
+
+# 3.4: Leverage vs. Residuals (Puntos influyentes)
+plot(modelo2, which = 5)
+
+# Paso 4: Evaluar la multicolinealidad con el factor de inflación de la varianza (VIF)
+vif(modelo2)
+```
+## **Variable Dependiente 2**
+   
+### Primer Modelo
+```{r}
+modelo3 <- lm(VD2 ~ Q3 + Q4 + Q5 + Q7 + Q8 + Q9_1 + TA, data = data)
+summary(modelo3)
+```
+En este primer modelo para predecir la percepción de los manifestantes se están usando las variables edad, género, nivel educativo, frecuencia de uso de redes sociales, nivel de engagement en redes sociales, ideología política, y exposición a fake news. Según la literatura presentada, estas son las variables más importantes para predecir las variables dependientes.   
+    
+Podemos observar que, según el modelo, las únicas variables que aportan son edad, ideología, género y en menor medida frecuencia de uso de redes sociales para informarse sobre política y la exposición a fake news.   
+
+### Segundo Modelo    
+
+```{r}
+modelo4 <- lm(VD2 ~ Q3 + Q4+ Q7+Q9_1 + TA, data = data)
+summary(modelo4)
+```
+    
+En este modelo con las variables relevantes del anterior encontramos que todas son relevantes. Dado que en este modelo todas las variables son relevantes y tiene un procentaje de predicción similar, podemos afirmar que este es el más óptimo entre los dos.    
+      
+```{r}
+# Paso 3: Diagnósticos del modelo
+# 3.1: Residuales vs Ajustados
+plot(modelo4, which = 1)
+
+# 3.2: Normalidad de los residuales (Q-Q plot)
+plot(modelo4, which = 2)
+
+# 3.3: Escala-Localización (Homoscedasticidad)
+plot(modelo4, which = 3)
+
+# 3.4: Leverage vs. Residuals (Puntos influyentes)
+plot(modelo4, which = 5)
+
+# Paso 4: Evaluar la multicolinealidad con el factor de inflación de la varianza (VIF)
+vif(modelo4)
+```
+# **Gráficos**
+
+```{r}
+ggplot(data, aes(x = Q3, y = VD1_1)) +
+  geom_point() +  # Gráfico de puntos (scatter plot)
+  labs(
+    title = "Gráfico de percepción de los manifestantes según la edad",  # Título del gráfico
+    x = "Edad",  # Etiqueta del eje x
+    y = "Nivel de aprobación de los manifestantes"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```
+```{r}
+ggplot(data, aes(x = TA, y = VD1_1)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot de Escala de Percepción de Manifestantes por Grupos",  # Título del gráfico
+    x = "Grupos",  # Etiqueta del eje x
+    y = "Aprobación de Manifestantes"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```
+   
+```{r}
+# Calcular la media y el error estándar para cada grupo
+data_summary <- data %>%
+  group_by(TA) %>%
+  dplyr::summarise(
+    mean_VD1_1 = mean(VD1_1, na.rm = TRUE),  # Calcular la media
+    sd_VD1_1 = sd(VD1_1, na.rm = TRUE),      # Calcular la desviación estándar
+    n = length(VD1_1),                       # Número de observaciones por grupo
+    se_VD1_1 = sd_VD1_1 / sqrt(n)            # Calcular el error estándar
+  )
+
+# Crear el gráfico de barras sin colores adicionales
+ggplot(data_summary, aes(x = TA, y = mean_VD1_1)) +
+  geom_bar(stat = "identity", fill = "white", color = "black", width = 0.7) +  # Barras en blanco y negro
+  geom_errorbar(aes(ymin = mean_VD1_1 - se_VD1_1, ymax = mean_VD1_1 + se_VD1_1), width = 0.2) +  # Barras de error
+  labs(
+    title = "Gráfico de Barras con Intervalo de Error de Aprobación por Grupos",
+    x = "Grupos",
+    y = "Aprobación de Manifestantes"
+  ) +
+  theme_classic()  # Tema clásico
+```
+   
+   
+```{r}
+ggplot(data, aes(x = TA, y = VD2)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot Aprobación de frases positivas sobre las manifestaciones por Grupos",  # Título del gráfico
+    x = "Grupos",  # Etiqueta del eje x
+    y = "Aprobación de afirmaciones positivas"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```
+
+```{r}
+# Calcular la media y el error estándar para cada grupo
+data_summary_VD2 <- data %>%
+  group_by(TA) %>%
+  dplyr::summarise(
+    mean_VD2 = mean(VD2, na.rm = TRUE),  # Calcular la media de VD2
+    sd_VD2 = sd(VD2, na.rm = TRUE),      # Calcular la desviación estándar de VD2
+    n_VD2 = length(VD2),                 # Número de observaciones de VD2 por grupo
+    se_VD2 = sd_VD2 / sqrt(n_VD2)        # Calcular el error estándar de VD2
+  )
+
+# Crear el gráfico de barras sin colores adicionales
+ggplot(data_summary_VD2, aes(x = TA, y = mean_VD2)) +
+  geom_bar(stat = "identity", fill = "white", color = "black", width = 0.7) +  # Barras en blanco y negro
+  geom_errorbar(aes(ymin = mean_VD2 - se_VD2, ymax = mean_VD2 + se_VD2), width = 0.2) +  # Barras de error
+  labs(
+    title = "Gráfico de Barras con Intervalo de Error de Aprobación de frases por Grupos",
+    x = "Grupos",
+    y = "Aprobación de afirmaciones positivas"
+  ) +
+  theme_classic()  # Tema clásico
+
+```
+
+
+```{r}
+data_boxplot1 <- data[complete.cases(data$Q3_1, data$VD1_1), ]
+ggplot(data_boxplot1, aes(x = Q3_1, y = VD1_1)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot de Escala de Percepción de Manifestantes por Edad",  # Título del gráfico
+    x = "Grupo Etario",  # Etiqueta del eje x
+    y = "Aprobación de manifestantes"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```
+  
+```{r}
+data_boxplot2 <- data[complete.cases(data$Q3_1, data$VD2), ]
+ggplot(data_boxplot2, aes(x = Q3_1, y = VD2)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot Aprobación de frases positivas sobre las manifestaciones por Edad",  # Título del gráfico
+    x = "Grupo Etario",  # Etiqueta del eje x
+    y = "Aprobación de afirmaciones positivas"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```
+```{r}
+data_boxplot2 <- data[complete.cases(data$Q3_1, data$VD2), ]
+
+# Calcular la media y el error estándar para cada grupo etario
+data_summary_Q3_1 <- data_boxplot2 %>%
+  group_by(Q3_1) %>%
+  dplyr::summarise(
+    mean_VD2 = mean(VD2, na.rm = TRUE),  # Calcular la media de VD2
+    sd_VD2 = sd(VD2, na.rm = TRUE),      # Calcular la desviación estándar de VD2
+    n_VD2 = length(VD2),                 # Número de observaciones de VD2 por grupo etario
+    se_VD2 = sd_VD2 / sqrt(n_VD2)        # Calcular el error estándar de VD2
+  )
+
+# Crear el gráfico de barras sin colores adicionales
+ggplot(data_summary_Q3_1, aes(x = Q3_1, y = mean_VD2)) +
+  geom_bar(stat = "identity", fill = "white", color = "black", width = 0.7) +  # Barras en blanco y negro
+  geom_errorbar(aes(ymin = mean_VD2 - se_VD2, ymax = mean_VD2 + se_VD2), width = 0.2) +  # Barras de error
+  labs(
+    title = "Gráfico de Barras con Intervalo de Error de Aprobación por Grupo Etario",
+    x = "Grupo Etario",  # Etiqueta del eje x
+    y = "Aprobación de afirmaciones positivas"  # Etiqueta del eje y
+  ) +
+  theme_classic()  # Tema clásico
+```
+     
+     
+     
+```{r}
+data_boxplot3 <- data[complete.cases(data$Q9_2, data$VD1_1), ]
+ggplot(data_boxplot3, aes(x = Q9_2, y = VD1_1)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot de Escala de Percepción de Manifestantes por Ideología",  # Título del gráfico
+    x = "Ideología Política",  # Etiqueta del eje x
+    y = "Aprobación de manifestantes"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```     
+
+```{r}
+data_boxplot3 <- data[complete.cases(data$Q9_2, data$VD1_1), ]
+
+# Calcular la media y el error estándar para cada grupo ideológico
+data_summary_Q9_2 <- data_boxplot3 %>%
+  group_by(Q9_2) %>%
+  dplyr::summarise(
+    mean_VD1_1 = mean(VD1_1, na.rm = TRUE),  # Calcular la media de VD1_1
+    sd_VD1_1 = sd(VD1_1, na.rm = TRUE),      # Calcular la desviación estándar de VD1_1
+    n_VD1_1 = length(VD1_1),                 # Número de observaciones de VD1_1 por ideología
+    se_VD1_1 = sd_VD1_1 / sqrt(n_VD1_1)      # Calcular el error estándar de VD1_1
+  )
+
+# Crear el gráfico de barras sin colores adicionales
+ggplot(data_summary_Q9_2, aes(x = Q9_2, y = mean_VD1_1)) +
+  geom_bar(stat = "identity", fill = "white", color = "black", width = 0.7) +  # Barras en blanco y negro
+  geom_errorbar(aes(ymin = mean_VD1_1 - se_VD1_1, ymax = mean_VD1_1 + se_VD1_1), width = 0.2) +  # Barras de error
+  labs(
+    title = "Gráfico de Barras con Intervalos - Aprobación de Manifestantes por Ideología",
+    x = "Ideología Política",  # Etiqueta del eje x
+    y = "Aprobación de manifestantes"  # Etiqueta del eje y
+  ) +
+  theme_classic()  # Tema clásico
+```
+
+  
+```{r}
+data_boxplot4 <- data[complete.cases(data$Q9_2, data$VD2), ]
+ggplot(data_boxplot4, aes(x = Q9_2, y = VD2)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot Aprobación de frases positivas sobre las manifestaciones por Ideología",  # Título del gráfico
+    x = "Ideología Política",  # Etiqueta del eje x
+    y = "Aprobación de afirmaciones positivas"  # Etiqueta del eje y
+  ) +
+  theme_classic()
+```
+
+```{r}
+ggplot(data, aes(x = Q3)) +
+  geom_boxplot() +  # Boxplot
+  labs(
+    title = "Boxplot de Edad",  # Título del gráfico
+    x = "Edad"  # Etiqueta del eje x
+  ) +
+  theme_classic()
+```
+
+```{r}
+porcentaje_educ <- prop.table(table(data$Q5)) * 100
+print(porcentaje_educ)
+```
+    
+```{r}
+counts <- table(data$Q6)  # Contar frecuencias de cada categoría en Q6
+porcentajes <- prop.table(counts) * 100  # Calcular porcentajes
+
+# Crear un data frame con los resultados
+porcentajes_df <- data.frame(
+  Categoria = names(counts),
+  Frecuencia = as.numeric(counts),
+  Porcentaje = round(porcentajes, 2)
+)
+
+# Crear el gráfico de barras de porcentajes
+ggplot(porcentajes_df, aes(x = Categoria, y = Porcentaje.Freq, fill = Categoria)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Porcentaje de Zonas de Residencia",
+       x = "Zonas",
+       y = "Porcentaje") +
+  theme_classic()
+```
+Alfa de Cronbach:  
+   
+```{r}
+# Seleccionamos las 5 variables para calcular el Alfa de Cronbach
+variables <- data[, c("VD2_1", "VD2_2", "VD2_3", "VD2_4", "VD2_5")]
+
+# Calculamos el Alfa de Cronbach
+alpha_result <- alpha(variables)
+print(alpha_result)
+
+```
+
